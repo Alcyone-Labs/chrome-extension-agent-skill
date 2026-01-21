@@ -8,112 +8,36 @@ usage() {
   cat <<EOF
 Usage: $0 [OPTIONS]
 
-Install the Chrome Extension MV3 Privacy Architect skill for OpenCode, Gemini CLI, and FactoryAI Droid.
+Install the ${SKILL_NAME} skill for OpenCode, Gemini CLI, Claude, FactoryAI Droid, and Agents.
 
 Options:
-  -g, --global    Install globally (~/.config/opencode/skill/)
-  -l, --local     Install locally (.opencode/skill/) [default]
-  -s, --self      Install from local filesystem (for testing)
+  -g, --global    Install globally (user scope) [default]
+  -l, --local     Install locally (.opencode/skills/, .gemini/skills/, etc.)
+  -s, --self      Install from local filesystem (for testing/dev)
   -h, --help      Show this help message
 
 Examples:
-  curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/chrome-extension-agent-skill/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/chrome-extension-agent-skill/main/install.sh | bash -s -- --global
+  # One-liner install script
+  curl -fsSL https://raw.githubusercontent.com/Alcyone-Labs/chrome-extension-agent-skill/main/resources/install.sh | bash
+  # Or, if you have the sources locally
+  ./resources/install.sh --self --local
 EOF
 }
 
-install_opencode_local() {
-  local target_dir=".opencode/skill/${SKILL_NAME}"
-  local command_dir=".opencode/command"
-
-  echo "Installing to OpenCode (local)..."
-
-  mkdir -p "$target_dir"
-  mkdir -p "$command_dir"
-
-  if [[ -d "$target_dir" ]]; then
-    echo "Updating existing local installation..."
-    rm -rf "$target_dir"
+# Strict validation of naming and environment
+validate_env() {
+  if [[ -z "${SKILL_NAME}" ]]; then
+    echo "Critical Error: SKILL_NAME is unset." >&2
+    exit 1
   fi
-
-  cp -r "${tmp_dir}/skill/${SKILL_NAME}" "$target_dir"
-
-  local command_path="${command_dir}/${SKILL_NAME}.md"
-  if [[ -d "$command_path" ]] || [[ -f "$command_path" ]]; then
-    rm -rf "$command_path"
+  if [[ "${SKILL_NAME}" == *"/"* ]] || [[ "${SKILL_NAME}" == *" "* ]] || [[ "${SKILL_NAME}" == ".." ]]; then
+    echo "Critical Error: SKILL_NAME contains illegal characters or path separators." >&2
+    exit 1
   fi
-  cp "${tmp_dir}/command/${SKILL_NAME}.md" "$command_path"
-
-  echo "Installed skill to: ${target_dir}"
-  echo "Installed command to: ${command_path}"
-}
-
-install_opencode_global() {
-  local target_dir="${HOME}/.config/opencode/skill/${SKILL_NAME}"
-  local command_dir="${HOME}/.config/opencode/command"
-
-  echo "Installing to OpenCode (global)..."
-
-  mkdir -p "$target_dir"
-  mkdir -p "$command_dir"
-
-  if [[ -d "$target_dir" ]]; then
-    echo "Updating existing global installation..."
-    rm -rf "$target_dir"
-  fi
-
-  cp -r "${tmp_dir}/skill/${SKILL_NAME}" "$target_dir"
-
-  local command_path="${command_dir}/${SKILL_NAME}.md"
-  if [[ -d "$command_path" ]] || [[ -f "$command_path" ]]; then
-    rm -rf "$command_path"
-  fi
-  cp "${tmp_dir}/command/${SKILL_NAME}.md" "$command_path"
-
-  echo "Installed skill to: ${target_dir}"
-  echo "Installed command to: ${command_path}"
-}
-
-install_gemini() {
-  local target_dir="${HOME}/.gemini/skills/${SKILL_NAME}"
-
-  echo "Installing to Gemini CLI..."
-
-  mkdir -p "$target_dir"
-
-  if [[ -d "$target_dir" ]]; then
-    echo "Updating existing Gemini installation..."
-    rm -rf "$target_dir"
-  fi
-
-  cp -r "${tmp_dir}/skill/${SKILL_NAME}" "$target_dir"
-
-  if [[ -f "${target_dir}/SKILL.md" ]]; then
-    mv "${target_dir}/SKILL.md" "${target_dir}/SKILL.md"
-  fi
-
-  echo "Installed skill to: ${target_dir}"
-}
-
-install_factory() {
-  local target_dir="${HOME}/.factory/skills/${SKILL_NAME}"
-
-  echo "Installing to FactoryAI Droid..."
-
-  mkdir -p "$target_dir"
-
-  if [[ -d "$target_dir" ]]; then
-    echo "Updating existing FactoryAI installation..."
-    rm -rf "$target_dir"
-  fi
-
-  cp -r "${tmp_dir}/skill/${SKILL_NAME}" "$target_dir"
-
-  echo "Installed skill to: ${target_dir}"
 }
 
 main() {
-  local install_type="local"
+  local install_type="global"
   local self_install=false
 
   while [[ $# -gt 0 ]]; do
@@ -126,61 +50,124 @@ main() {
     esac
   done
 
+  validate_env
+
   echo "Installing ${SKILL_NAME} skill (${install_type})..."
 
-  local tmp_dir
+  # 1. Setup Source
+  local src_dir
   if [[ "$self_install" == true ]]; then
-    tmp_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    echo "Installing from local source..."
-    # Create expected directory structure for self-install
-    mkdir -p "${tmp_dir}/skill/${SKILL_NAME}"
-    mkdir -p "${tmp_dir}/command"
-    if [[ -f "${tmp_dir}/SKILL.md" ]]; then
-      cp "${tmp_dir}/SKILL.md" "${tmp_dir}/skill/${SKILL_NAME}/SKILL.md"
-    fi
-    if [[ -f "${tmp_dir}/README.md" ]]; then
-      cp "${tmp_dir}/README.md" "${tmp_dir}/skill/${SKILL_NAME}/README.md"
-    fi
-    if [[ -d "${tmp_dir}/references" ]]; then
-      cp -r "${tmp_dir}/references" "${tmp_dir}/skill/${SKILL_NAME}/"
-    fi
-    if [[ -d "${tmp_dir}/resources" ]]; then
-      cp -r "${tmp_dir}/resources" "${tmp_dir}/skill/${SKILL_NAME}/"
-    fi
-    if [[ -f "${tmp_dir}/LICENSE.txt" ]]; then
-      cp "${tmp_dir}/LICENSE.txt" "${tmp_dir}/skill/${SKILL_NAME}/LICENSE.txt"
-    fi
-    # Handle command file naming
-    if [[ -f "${tmp_dir}/command/load-${SKILL_NAME}.md" ]] && [[ ! -f "${tmp_dir}/command/${SKILL_NAME}.md" ]]; then
-      cp "${tmp_dir}/command/load-${SKILL_NAME}.md" "${tmp_dir}/command/${SKILL_NAME}.md"
-    fi
+    src_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    echo "Using local source: ${src_dir}"
   else
-    tmp_dir=$(mktemp -d)
-    trap "rm -rf '$tmp_dir'" EXIT
-    echo "Fetching skill..."
-    git clone --depth 1 --quiet "$REPO_URL" "$tmp_dir"
+    src_dir=$(mktemp -d)
+    trap "rm -rf '$src_dir'" EXIT
+    echo "Fetching skill from ${REPO_URL}..."
+    git clone --depth 1 --quiet "$REPO_URL" "$src_dir"
   fi
 
+  # 2. Installation Helper with Deep Safety Checks
+  install_to() {
+    local platform_name=$1
+    local base_dir=$2
+    local command_dir=${3:-""}
+
+    local target_skill_dir="${base_dir}/${SKILL_NAME}"
+
+    # CRITICAL: Prevent accidental deletion of root, home, or system directories
+    if [[ -z "$target_skill_dir" ]] || [[ "$target_skill_dir" == "/" ]] || [[ "$target_skill_dir" == "$HOME" ]] || [[ "$target_skill_dir" == "$HOME/" ]]; then
+      echo "Safety Error: Target path is restricted: $target_skill_dir" >&2
+      return 1
+    fi
+
+    # Only proceed if the platform parent exists (for global) or we are in local mode
+    if [[ -d "${base_dir%/*}" ]] || [[ "$install_type" == "local" ]]; then
+      echo "Installing to ${platform_name}..."
+      mkdir -p "$base_dir"
+
+      if [[ -d "$target_skill_dir" ]]; then
+        # ENSURE we only delete the specific skill folder, double-checking it matches SKILL_NAME
+        case "$target_skill_dir" in
+          */"${SKILL_NAME}")
+            rm -rf "$target_skill_dir"
+            ;;
+          *)
+            echo "Safety Error: Target directory does not end in ${SKILL_NAME}. Aborting deletion." >&2
+            exit 1
+            ;;
+        esac
+      fi
+
+      cp -r "${src_dir}/skill/${SKILL_NAME}" "$target_skill_dir"
+
+      # Standardize SKILL.md for Gemini/others
+      if [[ -f "${target_skill_dir}/Skill.md" ]]; then
+        mv "${target_skill_dir}/Skill.md" "${target_skill_dir}/SKILL.md"
+      fi
+
+      # Install command if platform supports it (OpenCode)
+      if [[ -n "$command_dir" ]]; then
+        mkdir -p "$command_dir"
+        local cmd_path="${command_dir}/${SKILL_NAME}.md"
+        # Validate cmd_path is not a sensitive root dir
+        if [[ "$cmd_path" == "/" ]] || [[ "$cmd_path" == "$HOME" ]]; then
+          echo "Safety Error: Dangerous command path: $cmd_path" >&2
+          exit 1
+        fi
+        rm -f "$cmd_path"
+        cp "${src_dir}/command/${SKILL_NAME}.md" "$cmd_path"
+        echo "  Command installed to: ${cmd_path}"
+      fi
+
+      echo "  Skill installed to: ${target_skill_dir}"
+    fi
+  }
+
+  # 3. Define Paths & Execute
   if [[ "$install_type" == "global" ]]; then
-    install_opencode_global
+    # OpenCode
+    install_to "OpenCode (Global)" \
+      "${HOME}/.config/opencode/skills" \
+      "${HOME}/.config/opencode/commands"
+
+    # Gemini CLI
+    install_to "Gemini CLI (Global)" \
+      "${HOME}/.gemini/skills"
+
+    # Claude
+    install_to "Claude (Global)" \
+      "${HOME}/.claude/skills"
+
+    # FactoryAI Droid
+    install_to "FactoryAI Droid (Global)" \
+      "${HOME}/.factory/skills"
+
+    # Agents
+    install_to "Agents (Global)" \
+      "${HOME}/.config/agents/skills"
   else
-    install_opencode_local
+    # OpenCode
+    install_to "OpenCode (Local)" \
+      ".opencode/skills" \
+      ".opencode/commands"
+
+    # Gemini CLI
+    install_to "Gemini CLI (Local)" \
+      ".gemini/skills"
+
+    # Claude
+    install_to "Claude (Local)" \
+      ".claude/skills"
+
+    # FactoryAI Droid
+    install_to "FactoryAI Droid (Local)" \
+      ".factory/skills"
+
+    # Agents
+    install_to "Agents (Local)" \
+      ".agents/skills"
   fi
 
-  if [[ -d "${HOME}/.gemini" ]]; then
-    install_gemini
-  fi
-
-  if [[ -d "${HOME}/.factory" ]]; then
-    install_factory
-  fi
-
-  echo ""
-  echo "Usage:"
-  echo "  OpenCode: /${SKILL_NAME} <task>"
-  echo "  Gemini:   /skill ${SKILL_NAME} <task>"
-  echo "  Factory:  /skill ${SKILL_NAME} <task>"
-  echo ""
   echo "Done."
 }
 

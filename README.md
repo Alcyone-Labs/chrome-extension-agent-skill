@@ -98,7 +98,7 @@ Then use:
 ### Resources
 
 - `resources/install.sh`: Multi-platform installation script (OpenCode, Gemini, FactoryAI)
-- `command/load-chrome-extension-architect.md`: OpenCode command definition
+- `command/chrome-extension-architect.md`: OpenCode command definition
 
 ## Key Features
 
