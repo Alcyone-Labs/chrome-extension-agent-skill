@@ -8,7 +8,7 @@ usage() {
   cat <<EOF
 Usage: $0 [OPTIONS]
 
-Install the ${SKILL_NAME} skill for OpenCode, Gemini CLI, Claude, FactoryAI Droid, and Agents.
+Install the ${SKILL_NAME} skill for OpenCode, Gemini CLI, Claude, FactoryAI Droid, Agents, and Antigravity.
 
 Options:
   -g, --global    Install globally (user scope) [default]
@@ -145,6 +145,10 @@ main() {
     # Agents
     install_to "Agents (Global)" \
       "${HOME}/.config/agents/skills"
+
+    # Antigravity
+    install_to "Antigravity (Global)" \
+      "${HOME}/.antigravity/skills"
   else
     # OpenCode
     install_to "OpenCode (Local)" \
@@ -166,6 +170,10 @@ main() {
     # Agents
     install_to "Agents (Local)" \
       ".agents/skills"
+
+    # Antigravity
+    install_to "Antigravity (Local)" \
+      ".antigravity/skills"
   fi
 
   echo "Done."
